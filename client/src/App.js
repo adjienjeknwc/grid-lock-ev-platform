@@ -92,17 +92,52 @@ function App() {
 
   // Initial Load
   useEffect(() => {
-    if (user) {
-        localStorage.setItem('gridlock_user', JSON.stringify(user));
-        fetch('https://grid-lock-api.onrender.com/api/stations').then(res => res.json()).then(setStations);
-        fetch('https://grid-lock-api.onrender.com/api/bookings').then(res => res.json()).then(setBookings);
-        fetch(`https://grid-lock-api.onrender.com/api/wallet/${user.username}`).then(res => res.json()).then(data => setBalance(data.balance));
-        fetch(`https://grid-lock-api.onrender.com/api/transactions/${user.username}`).then(res => res.json()).then(setTransactions);
-        
-        socket.on("price_update", (updated) => setStations(prev => prev.map(s => s._id === updated._id ? updated : s)));
-        socket.on("global_update", (newStation) => setStations(prev => [...prev, newStation]));
-    } else { localStorage.removeItem('gridlock_user'); }
-  }, [user]);
+
+    if (!user) {
+      return (
+          <div className="h-screen w-full flex justify-center items-center bg-gray-900 text-gray-800 p-4">
+              <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 animate-in zoom-in text-center">
+                  
+                  {/* LOGO */}
+                  <div className="flex justify-center mb-4">
+                      <img src={logo} alt="Grid-Lock Logo" className="h-24 object-contain drop-shadow-lg" />
+                  </div>
+
+                  {/* DYNAMIC HEADER - Tells you exactly what mode you are in */}
+                  <h2 className="text-2xl font-black mb-6">
+                      {authMode === 'login' ? 'Welcome Back!' : 'Create Account'}
+                  </h2>
+                  
+                  <form onSubmit={handleAuth} className="space-y-4 text-left">
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase ml-1">Username</label>
+                        <input required className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-black outline-none font-bold" placeholder="e.g. Aditi_EV" value={authForm.username} onChange={e => setAuthForm({...authForm, username: e.target.value})} />
+                      </div>
+                      
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase ml-1">Password</label>
+                        <input type="password" required className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-black outline-none font-bold" placeholder="••••••" value={authForm.password} onChange={e => setAuthForm({...authForm, password: e.target.value})} />
+                      </div>
+
+                      {/* DYNAMIC BUTTON TEXT */}
+                      <button type="submit" className="w-full py-4 bg-black text-white font-bold rounded-xl hover:bg-gray-800 transition-transform active:scale-95 text-lg">
+                          {authMode === 'login' ? 'Login' : 'Sign Up'}
+                      </button>
+                  </form>
+
+                  {/* CLEARER SWITCH BUTTON */}
+                  <button 
+                    type="button" 
+                    onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')} 
+                    className="w-full mt-6 text-sm text-gray-500 font-bold hover:text-black transition-colors"
+                  >
+                      {authMode === 'login' ? "Don't have an account? Sign Up" : "Already have an account? Login"}
+                  </button>
+              </div>
+          </div>
+      );
+  }
+    
 
   // Logic Helpers
   const handleLocateMe = () => {

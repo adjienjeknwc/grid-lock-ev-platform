@@ -141,17 +141,43 @@ function App() {
 
   // Logic Helpers
   const handleLocateMe = () => {
-    if (!navigator.geolocation) { alert("Geolocation not supported"); return; }
+    if (!navigator.geolocation) { 
+        alert("Geolocation is not supported by this browser."); 
+        return; 
+    }
+    
     setUserAddress("Detecting...");
+    
+    // Request high accuracy for better results
+    const options = {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+    };
+
     navigator.geolocation.getCurrentPosition((position) => {
         const { latitude, longitude } = position.coords;
         setUserLocation({ lat: latitude, lng: longitude });
         setUserAddress(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        
         const withDist = stations.map(s => ({ ...s, distance: getDistance(latitude, longitude, s.location.lat, s.location.lng) }));
         setNearestStations(withDist.sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance)).slice(0, 3));
+        
         setMobileMenuOpen(true);
-    }, () => { setUserAddress("Location failed"); alert("Unable to retrieve location"); });
+    }, (error) => {
+        console.error("GPS Error: ", error);
+        let errorMsg = "Unable to retrieve location.";
+        
+        // Custom error messages based on what went wrong
+        if (error.code === 1) errorMsg = "Permission Denied! Please allow location access in your browser settings.";
+        else if (error.code === 2) errorMsg = "Position Unavailable. Please check your GPS.";
+        else if (error.code === 3) errorMsg = "Request Timed Out. Please try again.";
+        
+        setUserAddress("Location Failed");
+        alert(errorMsg);
+    }, options);
   };
+    
 
   const getDistance = (lat1, lon1, lat2, lon2) => {
       const R = 6371; 

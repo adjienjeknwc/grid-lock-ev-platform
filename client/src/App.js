@@ -37,7 +37,7 @@ const userIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
-const socket = io.connect("http://localhost:3001");
+const socket = io.connect("https://grid-lock-api.onrender.com");
 
 // --- HELPER: MOVE MAP ---
 function MapUpdater({ center }) {
@@ -94,10 +94,10 @@ function App() {
   useEffect(() => {
     if (user) {
         localStorage.setItem('gridlock_user', JSON.stringify(user));
-        fetch('http://localhost:3001/api/stations').then(res => res.json()).then(setStations);
-        fetch('http://localhost:3001/api/bookings').then(res => res.json()).then(setBookings);
-        fetch(`http://localhost:3001/api/wallet/${user.username}`).then(res => res.json()).then(data => setBalance(data.balance));
-        fetch(`http://localhost:3001/api/transactions/${user.username}`).then(res => res.json()).then(setTransactions);
+        fetch('https://grid-lock-api.onrender.com/api/stations').then(res => res.json()).then(setStations);
+        fetch('https://grid-lock-api.onrender.com/api/bookings').then(res => res.json()).then(setBookings);
+        fetch(`https://grid-lock-api.onrender.com/api/wallet/${user.username}`).then(res => res.json()).then(data => setBalance(data.balance));
+        fetch(`https://grid-lock-api.onrender.com/api/transactions/${user.username}`).then(res => res.json()).then(setTransactions);
         
         socket.on("price_update", (updated) => setStations(prev => prev.map(s => s._id === updated._id ? updated : s)));
         socket.on("global_update", (newStation) => setStations(prev => [...prev, newStation]));
@@ -152,7 +152,7 @@ function App() {
   const handleAuth = async (e) => {
     e.preventDefault();
     try {
-        const res = await fetch(`http://localhost:3001${authMode === 'login' ? '/api/login' : '/api/signup'}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(authForm) });
+        const res = await fetch(`https://grid-lock-api.onrender.com${authMode === 'login' ? '/api/login' : '/api/signup'}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(authForm) });
         const data = await res.json();
         if (res.ok) setUser(data); else alert(data.error);
     } catch (e) { alert("Server Error"); }
@@ -163,7 +163,7 @@ function App() {
   const handleChangePasswordLoggedIn = async (e) => {
     e.preventDefault();
     try {
-        const res = await fetch('http://localhost:3001/api/reset-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user.username, newPassword: newPasswordForm }) });
+        const res = await fetch('https://grid-lock-api.onrender.com/api/reset-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user.username, newPassword: newPasswordForm }) });
         if(res.ok) { alert("Password updated!"); setShowSettingsModal(false); setNewPasswordForm(""); } else { alert("Failed to update"); }
     } catch(err) { alert("Server Error"); }
   };
@@ -171,7 +171,7 @@ function App() {
   const processPayment = async () => {
     setProcessing(true);
     setTimeout(async () => {
-        const res = await fetch('http://localhost:3001/api/bookings', {
+        const res = await fetch('https://grid-lock-api.onrender.com/api/bookings', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ stationName: activeStation.name, price: activeStation.currentPrice, paymentMethod: paymentMethod === 'upi' ? "GPay/UPI" : "Card", username: user.username, vehicleType })
         });
@@ -179,11 +179,11 @@ function App() {
             const newBooking = await res.json();
             setBookings([newBooking, ...bookings]);
             if (paymentMethod === 'wallet') {
-                const wRes = await fetch(`http://localhost:3001/api/wallet/${user.username}`);
+                const wRes = await fetch(`https://grid-lock-api.onrender.com/api/wallet/${user.username}`);
                 const wData = await wRes.json();
                 setBalance(wData.balance);
             }
-            fetch(`http://localhost:3001/api/transactions/${user.username}`).then(res => res.json()).then(setTransactions);
+            fetch(`https://grid-lock-api.onrender.com/api/transactions/${user.username}`).then(res => res.json()).then(setTransactions);
             setProcessing(false); setShowPaymentGateway(false); setLastBookedStation(activeStation); setActiveStation(null); startChargingSimulation(); 
         } else { alert("Payment Failed!"); setProcessing(false); }
     }, 1500);
@@ -197,17 +197,17 @@ function App() {
 
   const handleSubmitReview = async () => {
     if(!lastBookedStation) return;
-    await fetch(`http://localhost:3001/api/stations/${lastBookedStation._id}/reviews`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user: user.username, rating: reviewForm.rating, comment: reviewForm.comment }) });
+    await fetch(`https://grid-lock-api.onrender.com/api/stations/${lastBookedStation._id}/reviews`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user: user.username, rating: reviewForm.rating, comment: reviewForm.comment }) });
     setShowReviewModal(false); setActiveInvoice(bookings[0]); 
   };
 
   const handleAddFunds = async () => {
     setProcessing(true);
     setTimeout(async () => {
-        const res = await fetch('http://localhost:3001/api/wallet/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user.username, amount: addAmount }) });
+        const res = await fetch('https://grid-lock-api.onrender.com/api/wallet/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user.username, amount: addAmount }) });
         const data = await res.json();
         setBalance(data.balance);
-        fetch(`http://localhost:3001/api/transactions/${user.username}`).then(res => res.json()).then(setTransactions);
+        fetch(`https://grid-lock-api.onrender.com/api/transactions/${user.username}`).then(res => res.json()).then(setTransactions);
         setProcessing(false); setShowAddFundsModal(false); alert(`Added ₹${addAmount} via ${paymentMethod === 'upi' ? 'GPay' : 'Card'}!`);
     }, 2000);
   };
@@ -228,7 +228,7 @@ function App() {
       lat: userLocation ? userLocation.lat : 28.6315, 
       lng: userLocation ? userLocation.lng : 77.2167 
     };
-    await fetch('http://localhost:3001/api/stations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newStation) });
+    await fetch('https://grid-lock-api.onrender.com/api/stations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newStation) });
     setShowHostModal(false); 
     setFormData({ name: '', price: '', address: '', phone: '', hostName: '', adharId: '', timings: '' }); 
     alert("Station Deployed Successfully!");

@@ -8,7 +8,7 @@ import {
   CreditCard, Star, BatteryCharging, TrendingUp, Clock, ArrowUpRight, 
   ArrowDownLeft, Plus, LogOut, Phone, MessageSquare, Send, User, Car, 
   Bike, Map as MapIcon, Settings, Navigation, Crosshair, Menu, ChevronUp, ChevronDown, 
-  Smartphone, AlertCircle, PhoneCall, Key, ThumbsUp, Home, Search, QrCode, UserCheck, Calendar
+  Smartphone, AlertCircle, PhoneCall, Key, ThumbsUp, Home, Search, QrCode
 } from 'lucide-react';
 
 // --- ICONS SETUP ---
@@ -90,70 +90,27 @@ function App() {
   const [chatMessage, setChatMessage] = useState("");
   const [newPasswordForm, setNewPasswordForm] = useState("");
 
-  // Initial Load
+  // Initial Data Fetch on User Change (Correct Pattern)
   useEffect(() => {
-
-    if (!user) {
-      return (
-          <div className="h-screen w-full flex justify-center items-center bg-gray-900 text-gray-800 p-4">
-              <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 animate-in zoom-in text-center">
-                  
-                  {/* LOGO */}
-                  <div className="flex justify-center mb-4">
-                      <img src={logo} alt="Grid-Lock Logo" className="h-24 object-contain drop-shadow-lg" />
-                  </div>
-
-                  {/* DYNAMIC HEADER - Tells you exactly what mode you are in */}
-                  <h2 className="text-2xl font-black mb-6">
-                      {authMode === 'login' ? 'Welcome Back!' : 'Create Account'}
-                  </h2>
-                  
-                  <form onSubmit={handleAuth} className="space-y-4 text-left">
-                      <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase ml-1">Username</label>
-                        <input required className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-black outline-none font-bold" placeholder="e.g. Aditi_EV" value={authForm.username} onChange={e => setAuthForm({...authForm, username: e.target.value})} />
-                      </div>
-                      
-                      <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase ml-1">Password</label>
-                        <input type="password" required className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-black outline-none font-bold" placeholder="••••••" value={authForm.password} onChange={e => setAuthForm({...authForm, password: e.target.value})} />
-                      </div>
-
-                      {/* DYNAMIC BUTTON TEXT */}
-                      <button type="submit" className="w-full py-4 bg-black text-white font-bold rounded-xl hover:bg-gray-800 transition-transform active:scale-95 text-lg">
-                          {authMode === 'login' ? 'Login' : 'Sign Up'}
-                      </button>
-                  </form>
-
-                  {/* CLEARER SWITCH BUTTON */}
-                  <button 
-                    type="button" 
-                    onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')} 
-                    className="w-full mt-6 text-sm text-gray-500 font-bold hover:text-black transition-colors"
-                  >
-                      {authMode === 'login' ? "Don't have an account? Sign Up" : "Already have an account? Login"}
-                  </button>
-              </div>
-          </div>
-      );
-  }
-    
+    if (user) {
+        localStorage.setItem('gridlock_user', JSON.stringify(user));
+        fetch('https://grid-lock-api.onrender.com/api/stations').then(res => res.json()).then(setStations);
+        fetch('https://grid-lock-api.onrender.com/api/bookings').then(res => res.json()).then(setBookings);
+        fetch(`https://grid-lock-api.onrender.com/api/wallet/${user.username}`).then(res => res.json()).then(data => setBalance(data.balance));
+        fetch(`https://grid-lock-api.onrender.com/api/transactions/${user.username}`).then(res => res.json()).then(setTransactions);
+        
+        socket.on("price_update", (updated) => setStations(prev => prev.map(s => s._id === updated._id ? updated : s)));
+        socket.on("global_update", (newStation) => setStations(prev => [...prev, newStation]));
+    } else { localStorage.removeItem('gridlock_user'); }
+  }, [user]);
 
   // Logic Helpers
   const handleLocateMe = () => {
-    if (!navigator.geolocation) { 
-        alert("Geolocation is not supported by this browser."); 
-        return; 
-    }
+    if (!navigator.geolocation) { alert("Geolocation is not supported by this browser."); return; }
     
     setUserAddress("Detecting...");
     
-    // Request high accuracy for better results
-    const options = {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-    };
+    const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
 
     navigator.geolocation.getCurrentPosition((position) => {
         const { latitude, longitude } = position.coords;
@@ -167,8 +124,6 @@ function App() {
     }, (error) => {
         console.error("GPS Error: ", error);
         let errorMsg = "Unable to retrieve location.";
-        
-        // Custom error messages based on what went wrong
         if (error.code === 1) errorMsg = "Permission Denied! Please allow location access in your browser settings.";
         else if (error.code === 2) errorMsg = "Position Unavailable. Please check your GPS.";
         else if (error.code === 3) errorMsg = "Request Timed Out. Please try again.";
@@ -177,7 +132,6 @@ function App() {
         alert(errorMsg);
     }, options);
   };
-    
 
   const getDistance = (lat1, lon1, lat2, lon2) => {
       const R = 6371; 
@@ -210,6 +164,7 @@ function App() {
       return 'bg-green-100 text-green-600';
   };
 
+  // Auth & Payments
   const handleAuth = async (e) => {
     e.preventDefault();
     try {
@@ -275,14 +230,13 @@ function App() {
 
   const handleSendMessage = () => { setChatMessage(""); };
 
-  // --- UPDATED ADD STATION FUNCTION ---
   const handleAddStation = async (e) => {
     e.preventDefault();
     const newStation = {
       name: formData.name, 
-      hostName: formData.hostName, // NEW
-      adharId: formData.adharId,   // NEW
-      timings: formData.timings,   // NEW
+      hostName: formData.hostName,
+      adharId: formData.adharId,
+      timings: formData.timings,
       basePrice: Number(formData.price), 
       address: formData.address, 
       hostPhone: formData.phone,
@@ -295,17 +249,42 @@ function App() {
     alert("Station Deployed Successfully!");
   };
 
+  // --- Login/Signup Screen Render Logic (Moved outside useEffect) ---
   if (!user) {
       return (
           <div className="h-screen w-full flex justify-center items-center bg-gray-900 text-gray-800 p-4">
               <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 animate-in zoom-in text-center">
+                  
+                  {/* LOGO */}
                   <div className="flex justify-center mb-6"><img src={logo} alt="Grid-Lock Logo" className="h-28 object-contain drop-shadow-lg" /></div>
+                  
+                  <h2 className="text-2xl font-black mb-6">
+                      {authMode === 'login' ? 'Welcome Back!' : 'Create Account'}
+                  </h2>
+                  
                   <form onSubmit={handleAuth} className="space-y-4 text-left">
-                      <input required className="w-full p-3 border rounded" placeholder="Username" value={authForm.username} onChange={e => setAuthForm({...authForm, username: e.target.value})} />
-                      <input type="password" required className="w-full p-3 border rounded" placeholder="Password" value={authForm.password} onChange={e => setAuthForm({...authForm, password: e.target.value})} />
-                      <button type="submit" className="w-full py-3 bg-gray-900 text-white font-bold rounded">Login / Sign Up</button>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase ml-1">Username</label>
+                        <input required className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-black outline-none font-bold" placeholder="e.g. Aditi_EV" value={authForm.username} onChange={e => setAuthForm({...authForm, username: e.target.value})} />
+                      </div>
+                      
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase ml-1">Password</label>
+                        <input type="password" required className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-black outline-none font-bold" placeholder="••••••" value={authForm.password} onChange={e => setAuthForm({...authForm, password: e.target.value})} />
+                      </div>
+
+                      <button type="submit" className="w-full py-4 bg-black text-white font-bold rounded-xl hover:bg-gray-800 transition-transform active:scale-95 text-lg">
+                          {authMode === 'login' ? 'Login' : 'Sign Up'}
+                      </button>
                   </form>
-                  <button onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')} className="w-full mt-4 text-sm underline text-center block">Switch Mode</button>
+
+                  <button 
+                    type="button" 
+                    onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')} 
+                    className="w-full mt-6 text-sm text-gray-500 font-bold hover:text-black transition-colors"
+                  >
+                      {authMode === 'login' ? "Don't have an account? Sign Up" : "Already have an account? Login"}
+                  </button>
               </div>
           </div>
       );
@@ -352,6 +331,8 @@ function App() {
         </div>
         
         <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 md:bg-gray-900">
+            
+            {/* --- HOME VIEW --- */}
             {currentView === 'home' && (
                 <div className="space-y-6 animate-in slide-in-from-bottom-5">
                     {/* Welcome Card */}
@@ -429,16 +410,22 @@ function App() {
             {currentView === 'history' && (
                 transactions.length === 0 ? <div className="text-center p-8 text-gray-400"><AlertCircle className="mx-auto mb-2 opacity-50"/><p className="text-xs">No transactions.</p></div> :
                 transactions.map(t => (
-                    <div key={t._id} className="p-3 bg-white md:bg-gray-800 rounded-lg shadow-sm border border-gray-100 md:border-gray-700 flex justify-between items-center">
+                    <div key={t._id} onClick={() => { setActiveStation(t.stationName); setCurrentView('map'); }} className="p-3 bg-white md:bg-gray-800 rounded-lg shadow-sm border border-gray-100 md:border-gray-700 flex justify-between items-center cursor-pointer">
                         <div className="flex items-center gap-3"><div className={`p-2 rounded-full ${t.type === 'CREDIT' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>{t.type === 'CREDIT' ? <ArrowDownLeft size={16}/> : <ArrowUpRight size={16}/>}</div><div><p className="text-xs font-bold md:text-white">{t.description}</p><p className="text-[10px] text-gray-400">{new Date(t.date).toLocaleDateString()}</p></div></div>
                         <span className={`font-mono font-bold text-sm ${t.type === 'CREDIT' ? 'text-green-600' : 'text-gray-800 md:text-white'}`}>{t.type === 'CREDIT' ? '+' : '-'}₹{t.amount}</span>
                     </div>
                 ))
             )}
         </div>
+        
+        <div className="p-4 border-t bg-white md:bg-gray-800 md:border-gray-700 flex items-center gap-3 pb-8 md:pb-4">
+            <div className="p-2 bg-blue-600 rounded-full text-white"><Wallet size={20}/></div>
+            <div className="flex-1"><p className="text-xs text-gray-500 md:text-gray-400">Balance</p><p className="text-lg font-mono font-bold md:text-white">₹{balance.toFixed(2)}</p></div>
+            <button onClick={() => setShowAddFundsModal(true)} className="p-3 bg-gray-100 md:bg-gray-700 rounded-full text-blue-600 md:text-blue-400"><Plus size={20} /></button>
+        </div>
       </div>
 
-      {/* --- STATION POPUP --- */}
+      {/* --- MODALS --- */}
       {activeStation && !showPaymentGateway && (
           <div className="fixed md:absolute bottom-0 md:top-6 md:bottom-auto left-0 right-0 md:left-auto md:right-6 md:w-80 bg-white p-6 rounded-t-3xl md:rounded-xl shadow-[0_-10px_40px_rgba(0,0,0,0.2)] z-[3000] animate-in slide-in-from-bottom-10 md:fade-in">
             <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-4 md:hidden"></div>
@@ -450,7 +437,6 @@ function App() {
           </div>
       )}
 
-      {/* CHAT MODAL */}
       {showChatModal && <div className="fixed md:absolute bottom-0 md:top-6 md:right-96 left-0 right-0 md:left-auto md:w-80 bg-white md:rounded-xl shadow-2xl z-[4000] border overflow-hidden flex flex-col h-[50vh] md:h-96 rounded-t-3xl animate-in slide-in-from-bottom-10"><div className="bg-blue-600 p-4 text-white flex justify-between items-center"><div className="flex items-center gap-2"><div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center"><User size={16}/></div><div><p className="font-bold text-sm">Station Host</p><p className="text-[10px] opacity-80">Online</p></div></div><button onClick={() => setShowChatModal(false)}><X size={18}/></button></div><div className="flex-1 bg-gray-50 p-3 overflow-y-auto"><div className="flex justify-start mb-2"><div className="bg-white p-2 rounded-lg rounded-tl-none text-sm shadow-sm border max-w-[80%]">Hello! Is the charger available?</div></div><div className="flex justify-end mb-2"><div className="bg-blue-600 text-white p-2 rounded-lg rounded-tr-none text-sm shadow-sm max-w-[80%]">Yes, it is open and ready!</div></div></div><div className="p-3 border-t bg-white flex gap-2"><input className="flex-1 text-sm p-2 border rounded-full bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Type a message..." value={chatMessage} onChange={e=>setChatMessage(e.target.value)}/><button onClick={handleSendMessage} className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700"><Send size={16}/></button></div></div>}
       {showPaymentGateway && activeStation && <div className="fixed inset-0 bg-black/60 z-[4000] flex justify-center items-end md:items-center p-4 backdrop-blur-sm"><div className="bg-white w-full max-w-md rounded-t-3xl md:rounded-2xl p-6 animate-in slide-in-from-bottom-10"><h2 className="text-xl font-bold mb-4">Pay ₹{activeStation.currentPrice}</h2><div className="flex gap-2 mb-4"><button onClick={()=>setPaymentMethod('card')} className="flex-1 p-3 border rounded text-sm font-bold">Card</button><button onClick={()=>setPaymentMethod('upi')} className="flex-1 p-3 border rounded text-sm font-bold">GPay/UPI</button></div><button onClick={processPayment} disabled={processing} className="w-full py-3 bg-green-600 text-white font-bold rounded-xl">{processing?"Processing...":"Pay Now"}</button><button onClick={()=>setShowPaymentGateway(false)} className="w-full mt-2 text-sm text-gray-500">Cancel</button></div></div>}
       {showAddFundsModal && <div className="fixed inset-0 bg-black/60 z-[5000] flex justify-center items-center p-4"><div className="bg-white w-full max-w-sm rounded-2xl p-6"><h2 className="font-bold mb-4">Add Money</h2><input type="number" value={addAmount} onChange={e=>setAddAmount(Number(e.target.value))} className="w-full p-2 border mb-4"/><button onClick={handleAddFunds} disabled={processing} className="w-full py-3 bg-blue-600 text-white font-bold rounded">{processing?"Processing...":"Pay"}</button><button onClick={()=>setShowAddFundsModal(false)} className="w-full mt-2 text-sm">Cancel</button></div></div>}
@@ -459,7 +445,6 @@ function App() {
       {showProfileModal && <div className="fixed inset-0 bg-black/60 z-[5000] flex justify-center items-center p-4"><div className="bg-white w-full max-w-md rounded-2xl p-6"><div className="flex justify-between mb-4"><h2 className="font-bold text-xl">Profile</h2><button onClick={()=>setShowProfileModal(false)}><X/></button></div><div className="p-6"><div className="flex justify-between items-start mb-4"><div className="flex items-center gap-4"><div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-3xl font-bold text-white border-4 border-white">{user.username[0].toUpperCase()}</div><div><h2 className="text-2xl font-bold">{user.username}</h2><p className="text-gray-400 text-xs flex items-center gap-1"><User size={12}/> ID: {user._id || "883920"}</p></div></div></div><button onClick={() => { setShowProfileModal(false); setShowSettingsModal(true); }} className="w-full py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-gray-200 border border-gray-300 mb-6"><Key size={12}/> Change Password</button><div className="grid grid-cols-2 gap-3 mb-6"><div className="p-4 bg-blue-50 rounded-xl text-center"><p className="text-xl font-black text-blue-600">₹{balance}</p><p className="text-[10px] uppercase font-bold text-gray-500">Wallet</p></div><div className="p-4 bg-green-50 rounded-xl text-center"><p className="text-xl font-black text-green-600">₹{stats.totalSpent}</p><p className="text-[10px] uppercase font-bold text-gray-500">Spent</p></div><div className="p-4 bg-purple-50 rounded-xl text-center"><p className="text-xl font-black text-purple-600">{stats.totalTrips}</p><p className="text-[10px] uppercase font-bold text-gray-500">Trips</p></div><div className="p-4 bg-yellow-50 rounded-xl text-center"><p className="text-xl font-black text-yellow-600 flex justify-center items-center gap-1">4.9 <Star size={14} fill="currentColor"/></p><p className="text-[10px] uppercase font-bold text-gray-500">Guest Rating</p></div></div><h3 className="font-bold text-sm mb-3 flex items-center gap-2 text-gray-700"><ThumbsUp size={16}/> What Hosts Say</h3><div className="space-y-3"><div className="p-3 bg-gray-50 rounded-lg border border-gray-100"><div className="flex justify-between items-center mb-1"><span className="font-bold text-xs">Indiranagar Station</span><div className="flex text-yellow-400"><Star size={10} fill="currentColor"/><Star size={10} fill="currentColor"/><Star size={10} fill="currentColor"/><Star size={10} fill="currentColor"/><Star size={10} fill="currentColor"/></div></div><p className="text-xs text-gray-500 italic">"Very polite user, unplugged on time!"</p></div><div className="p-3 bg-gray-50 rounded-lg border border-gray-100"><div className="flex justify-between items-center mb-1"><span className="font-bold text-xs">Marina Beach Hub</span><div className="flex text-yellow-400"><Star size={10} fill="currentColor"/><Star size={10} fill="currentColor"/><Star size={10} fill="currentColor"/><Star size={10} fill="currentColor"/><Star size={10} fill="currentColor"/></div></div><p className="text-xs text-gray-500 italic">"Great guest. Highly recommended."</p></div></div></div></div></div>}
       {activeInvoice && <div className="fixed inset-0 bg-black/60 z-[6000] flex justify-center items-center p-4"><div className="bg-white w-full max-w-sm p-8 rounded-2xl text-center"><div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4"><CheckCircle size={32}/></div><h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Success!</h2><p className="text-gray-500 mb-6">Transaction ID: <span className="font-mono font-bold text-black">{activeInvoice.invoiceId}</span></p><button onClick={() => setActiveInvoice(null)} className="w-full py-3 bg-gray-100 font-bold rounded-lg hover:bg-gray-200">Close Receipt</button></div></div>}
       {showSettingsModal && <div className="fixed inset-0 bg-black/60 z-[5000] flex justify-center items-center p-4"><div className="bg-white w-full max-w-sm rounded-2xl p-6"><h2 className="text-xl font-bold mb-4">Settings</h2><input type="password" placeholder="New Password" className="w-full p-3 border rounded-lg mb-4" onChange={e=>setNewPasswordForm(e.target.value)}/><button onClick={handleChangePasswordLoggedIn} className="w-full py-3 bg-red-600 text-white font-bold rounded-lg mb-2">Update Password</button><button onClick={()=>setShowSettingsModal(false)} className="w-full py-3 text-gray-500 font-bold">Close</button></div></div>}
-      {/* UPDATED HOST MODAL WITH NEW FIELDS */}
       {showHostModal && <div className="fixed inset-0 bg-black/80 z-[2000] flex justify-center items-center p-4"><div className="bg-white w-full max-w-md rounded-2xl p-6 max-h-[90vh] overflow-y-auto"><h2 className="text-2xl font-bold mb-4">Add Station</h2><form onSubmit={handleAddStation} className="space-y-3"><input required className="w-full p-3 border rounded-lg" placeholder="Station Name" value={formData.name} onChange={e=>setFormData({...formData, name:e.target.value})}/><input required className="w-full p-3 border rounded-lg" placeholder="Host Name" value={formData.hostName} onChange={e=>setFormData({...formData, hostName:e.target.value})}/><input required className="w-full p-3 border rounded-lg" placeholder="Aadhar ID" value={formData.adharId} onChange={e=>setFormData({...formData, adharId:e.target.value})}/><input required className="w-full p-3 border rounded-lg" placeholder="Station Address" value={formData.address} onChange={e=>setFormData({...formData, address:e.target.value})}/><div className="flex gap-2"><input required className="w-1/2 p-3 border rounded-lg" placeholder="Phone" value={formData.phone} onChange={e=>setFormData({...formData, phone:e.target.value})}/><input required className="w-1/2 p-3 border rounded-lg" placeholder="Time (9am-9pm)" value={formData.timings} onChange={e=>setFormData({...formData, timings:e.target.value})}/></div><input required type="number" className="w-full p-3 border rounded-lg" placeholder="Price per Hour (₹)" value={formData.price} onChange={e=>setFormData({...formData, price:e.target.value})}/><button type="submit" className="w-full py-3 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700">Deploy Station</button></form><button onClick={()=>setShowHostModal(false)} className="absolute top-4 right-4 bg-gray-100 p-2 rounded-full"><X size={18}/></button></div></div>}
     </div>
   );

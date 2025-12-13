@@ -142,7 +142,7 @@ def run_simulation():
     
     try:
         # Connect to your LIVE Render Backend
-        sio.connect('https://grid-lock-api.onrender.com')
+        sio.connect('http://localhost:3001')
         print("✅ Connected to Grid-Lock Server!")
     except Exception as e:
         print(f"❌ Connection Failed: {e}")
@@ -189,7 +189,7 @@ def run_simulation():
 if __name__ == "__main__":
     run_simulation()
 
-    
+
 
     # --- C. Visualization (The Proof) ---
     df = pd.DataFrame(history)

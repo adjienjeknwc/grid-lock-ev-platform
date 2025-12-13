@@ -100,8 +100,8 @@ function App() {
         localStorage.setItem('gridlock_user', JSON.stringify(user));
         
         // Fetch Initial Data
-        fetch('https://grid-lock-api.onrender.com/api/stations').then(res => res.json()).then(setStations);
-        fetch('https://grid-lock-api.onrender.com/api/bookings').then(res => res.json()).then(setBookings);
+        fetch('https://grid-lock-api.onrender.com').then(res => res.json()).then(setStations);
+        fetch('https://grid-lock-api.onrender.com').then(res => res.json()).then(setBookings);
         fetch(`https://grid-lock-api.onrender.com/api/wallet/${user.username}`).then(res => res.json()).then(data => setBalance(data.balance));
         fetch(`https://grid-lock-api.onrender.com/api/transactions/${user.username}`).then(res => res.json()).then(setTransactions);
         
@@ -238,7 +238,7 @@ socket.on("live_analytics", (data) => {
   const handleAddFunds = async () => {
     setProcessing(true);
     setTimeout(async () => {
-        const res = await fetch('https://grid-lock-api.onrender.com/api/wallet/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user.username, amount: addAmount }) });
+        const res = await fetch('hhttps://grid-lock-api.onrender.com/api/wallet/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user.username, amount: addAmount }) });
         const data = await res.json();
         setBalance(data.balance);
         fetch(`https://grid-lock-api.onrender.com/api/transactions/${user.username}`).then(res => res.json()).then(setTransactions);

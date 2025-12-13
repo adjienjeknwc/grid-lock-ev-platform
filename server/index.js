@@ -37,6 +37,11 @@ mongoose.connect(MONGO_URI)
 io.on("connection", (socket) => {
   console.log(`User Connected: ${socket.id}`);
 
+  socket.on("sim_update", (data) => {
+    console.log("Python sent data:", data); // Add this log to debug
+    io.emit("live_analytics", data);
+});
+
   // 1. Existing Bidding Logic
   socket.on("place_bid", async (data) => {
     const { stationId, amount } = data;

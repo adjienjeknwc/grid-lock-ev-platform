@@ -33,21 +33,30 @@ mongoose.connect(MONGO_URI)
 .catch(err => console.error("❌ DB Error:", err));
 
 // --- SOCKET.IO LOGIC (Real-time Bids) ---
+// --- SOCKET.IO LOGIC ---
 io.on("connection", (socket) => {
   console.log(`User Connected: ${socket.id}`);
 
+  // 1. Existing Bidding Logic
   socket.on("place_bid", async (data) => {
     const { stationId, amount } = data;
-    // Update price in database
     const station = await Station.findById(stationId);
     if(station) {
         station.currentPrice = amount;
         await station.save();
-        // Broadcast new price to EVERYONE connected
         io.emit("price_update", station); 
     }
   });
+
+  // 2. NEW: Handle Simulation Data from Python
+  // When Python sends "sim_update", we broadcast it as "live_analytics" to React
+  socket.on("sim_update", (data) => {
+      // Broadcast to all connected clients (The React App)
+      io.emit("live_analytics", data);
+  });
 });
+
+
 
 // --- API ROUTES ---
 

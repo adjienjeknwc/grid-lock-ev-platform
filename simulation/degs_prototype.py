@@ -124,48 +124,72 @@ class APTSEngine:
 # ==========================================
 # 3. MAIN SIMULATION LOOP (Visualization)
 # ==========================================
+# ... (Keep DataSimulator and APTSEngine classes exactly as they were) ...
+
+# ==========================================
+# 3. MAIN SIMULATION LOOP (Connected)
+# ==========================================
+import socketio # NEW LIBRARY
+import time
+
 def run_simulation():
-    # Setup
+    # Setup Components
     simulator = DataSimulator()
     engine = APTSEngine(critical_temp=85.0)
     
-    # --- A. Pre-Training Phase (Synthetic Data) ---
+    # Setup Socket Connection
+    sio = socketio.Client()
+    
+    try:
+        # Connect to your LIVE Render Backend
+        sio.connect('https://grid-lock-api.onrender.com')
+        print("✅ Connected to Grid-Lock Server!")
+    except Exception as e:
+        print(f"❌ Connection Failed: {e}")
+        return
+
+    # A. Pre-Training Phase (Synthetic Data)
     print("Training Predictive Model...")
     X_train, y_train = [], []
     for _ in range(500):
         D = simulator.generate_data(alpha=0.0)
         X_train.append([D['L_actual'], D['T_transformer'], D['T_ambient'], D['P_utility']])
-        # Simple physics rule for 'ground truth' target: Next Temp is current + load factor
         future_temp = D['T_transformer'] + (D['L_actual']/100)**2 * 5.0 
         y_train.append(future_temp)
-    
     engine.train_tpm(np.array(X_train), np.array(y_train))
     
-    # --- B. Real-Time Simulation Phase ---
-    history = []
+    # B. Real-Time Simulation Loop
     alpha_applied = 0.0
+    print("\n🚀 Broadcasting Live Data to Dashboard...")
     
-    print("\nStarting Simulation (200 Steps)...")
-    
-    for i in range(200): 
-        # 1. Get Sensor Data
+    while True: # Run forever until you stop it
+        # 1. Generate & Process
         D = simulator.generate_data(alpha_applied)
-        
-        # 2. Run Algorithm
         alpha, T_predicted = engine.calculate_soft_load_shaping_factor(D)
-        
-        # 3. Apply Action (for next step)
         alpha_applied = alpha
         
-        # 4. Log Data
-        history.append({
-            'Time': D['time'],
-            'Temp_Actual': D['T_transformer'],
-            'Temp_Predicted': T_predicted,
-            'Load': D['L_actual'],
-            'Alpha': alpha_applied,
-            'Critical_Limit': engine.T_critical
-        })
+        # 2. Create Payload
+        payload = {
+            'timestamp': D['time'],
+            'temp_actual': round(D['T_transformer'], 2),
+            'temp_predicted': round(T_predicted, 2),
+            'load': round(D['L_actual'], 2),
+            'alpha': round(alpha_applied, 2),
+            'status': "CRITICAL" if T_predicted > engine.T_critical else "OPTIMAL"
+        }
+        
+        # 3. Emit to Server (This sends data to the website!)
+        sio.emit('sim_update', payload)
+        
+        print(f"Sent: Temp={payload['temp_actual']} | Alpha={payload['alpha']}")
+        
+        # Slow down so we can see it on the website (1 update per second)
+        time.sleep(1) 
+
+if __name__ == "__main__":
+    run_simulation()
+
+    
 
     # --- C. Visualization (The Proof) ---
     df = pd.DataFrame(history)

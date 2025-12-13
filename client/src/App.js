@@ -61,6 +61,9 @@ function App() {
   const [userLocation, setUserLocation] = useState(null); 
   const [userAddress, setUserAddress] = useState("Tap GPS to detect");
   const [nearestStations, setNearestStations] = useState([]); 
+  
+  // NEW: Analytics State for Python Simulation
+  const [analytics, setAnalytics] = useState(null);
 
   // Modals
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -81,6 +84,7 @@ function App() {
   const [chargingProgress, setChargingProgress] = useState(0);
   const [reviewForm, setReviewForm] = useState({ rating: 5, comment: "" });
   const [lastBookedStation, setLastBookedStation] = useState(null);
+  
   // UPDATED FORM DATA STATE
   const [formData, setFormData] = useState({ 
       name: '', price: '', address: '', phone: '', 
@@ -90,18 +94,29 @@ function App() {
   const [chatMessage, setChatMessage] = useState("");
   const [newPasswordForm, setNewPasswordForm] = useState("");
 
-  // Initial Data Fetch on User Change (Correct Pattern)
+  // Initial Data Fetch & Socket Listeners
   useEffect(() => {
     if (user) {
         localStorage.setItem('gridlock_user', JSON.stringify(user));
+        
+        // Fetch Initial Data
         fetch('https://grid-lock-api.onrender.com/api/stations').then(res => res.json()).then(setStations);
         fetch('https://grid-lock-api.onrender.com/api/bookings').then(res => res.json()).then(setBookings);
         fetch(`https://grid-lock-api.onrender.com/api/wallet/${user.username}`).then(res => res.json()).then(data => setBalance(data.balance));
         fetch(`https://grid-lock-api.onrender.com/api/transactions/${user.username}`).then(res => res.json()).then(setTransactions);
         
+        // Socket Listeners
         socket.on("price_update", (updated) => setStations(prev => prev.map(s => s._id === updated._id ? updated : s)));
         socket.on("global_update", (newStation) => setStations(prev => [...prev, newStation]));
-    } else { localStorage.removeItem('gridlock_user'); }
+        
+        // NEW: Listen for Python Simulation Data
+        socket.on("live_analytics", (data) => {
+            setAnalytics(data);
+        });
+        
+    } else { 
+        localStorage.removeItem('gridlock_user'); 
+    }
   }, [user]);
 
   // Logic Helpers
@@ -249,7 +264,7 @@ function App() {
     alert("Station Deployed Successfully!");
   };
 
-  // --- Login/Signup Screen Render Logic (Moved outside useEffect) ---
+  // --- Login/Signup Screen Render Logic ---
   if (!user) {
       return (
           <div className="h-screen w-full flex justify-center items-center bg-gray-900 text-gray-800 p-4">
@@ -335,6 +350,46 @@ function App() {
             {/* --- HOME VIEW --- */}
             {currentView === 'home' && (
                 <div className="space-y-6 animate-in slide-in-from-bottom-5">
+                    
+                    {/* NEW: LIVE SYSTEM MONITOR (Only shows when Python script is running) */}
+                    {analytics && (
+                        <div className="mb-6 p-4 bg-black rounded-2xl text-white shadow-xl border border-gray-800 animate-pulse">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-sm flex items-center gap-2">
+                                    <div className="w-2 h-2 bg-green-500 rounded-full animate-ping"></div>
+                                    DEGS-Node Live Stream
+                                </h3>
+                                <span className={`px-2 py-1 rounded text-[10px] font-bold ${analytics.status === 'CRITICAL' ? 'bg-red-600' : 'bg-green-600'}`}>
+                                    {analytics.status}
+                                </span>
+                            </div>
+                            
+                            <div className="grid grid-cols-3 gap-2 text-center">
+                                <div className="p-2 bg-gray-900 rounded-lg">
+                                    <p className="text-[10px] text-gray-400 uppercase">Transformer</p>
+                                    <p className={`text-xl font-bold ${analytics.temp_actual > 80 ? 'text-red-500' : 'text-white'}`}>
+                                        {analytics.temp_actual}°C
+                                    </p>
+                                </div>
+                                <div className="p-2 bg-gray-900 rounded-lg">
+                                    <p className="text-[10px] text-gray-400 uppercase">Prediction</p>
+                                    <p className="text-xl font-bold text-blue-400">
+                                        {analytics.temp_predicted}°C
+                                    </p>
+                                </div>
+                                <div className="p-2 bg-gray-900 rounded-lg">
+                                    <p className="text-[10px] text-gray-400 uppercase">Load Shaping</p>
+                                    <p className="text-xl font-bold text-purple-400">
+                                        {(analytics.alpha * 100).toFixed(0)}%
+                                    </p>
+                                </div>
+                            </div>
+                            <p className="text-[10px] text-gray-500 mt-2 text-center">
+                                Algo: APTS-Predictive v1.0 • Latency: 24ms
+                            </p>
+                        </div>
+                    )}
+
                     {/* Welcome Card */}
                     <div className="bg-gradient-to-r from-gray-900 to-gray-800 md:from-blue-600 md:to-purple-600 p-5 rounded-2xl text-white shadow-lg">
                         <div className="flex justify-between items-start">
@@ -443,7 +498,6 @@ function App() {
       {showChargingScreen && <div className="fixed inset-0 bg-black/95 z-[6000] flex flex-col justify-center items-center text-white"><BatteryCharging size={120} className={chargingProgress<100?"animate-pulse text-yellow-400":"text-green-500"}/><h2 className="text-3xl font-bold mt-4">{chargingProgress}% Charged</h2></div>}
       {showReviewModal && <div className="fixed inset-0 bg-black/60 z-[6000] flex justify-center items-center p-4"><div className="bg-white p-6 rounded-2xl text-center"><Star size={40} className="text-yellow-400 mx-auto mb-4"/><button onClick={handleSubmitReview} className="w-full py-3 bg-black text-white font-bold rounded">Submit Review</button></div></div>}
       {showProfileModal && <div className="fixed inset-0 bg-black/60 z-[5000] flex justify-center items-center p-4"><div className="bg-white w-full max-w-md rounded-2xl p-6"><div className="flex justify-between mb-4"><h2 className="font-bold text-xl">Profile</h2><button onClick={()=>setShowProfileModal(false)}><X/></button></div><div className="p-6"><div className="flex justify-between items-start mb-4"><div className="flex items-center gap-4"><div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-3xl font-bold text-white border-4 border-white">{user.username[0].toUpperCase()}</div><div><h2 className="text-2xl font-bold">{user.username}</h2><p className="text-gray-400 text-xs flex items-center gap-1"><User size={12}/> ID: {user._id || "883920"}</p></div></div></div><button onClick={() => { setShowProfileModal(false); setShowSettingsModal(true); }} className="w-full py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-gray-200 border border-gray-300 mb-6"><Key size={12}/> Change Password</button><div className="grid grid-cols-2 gap-3 mb-6"><div className="p-4 bg-blue-50 rounded-xl text-center"><p className="text-xl font-black text-blue-600">₹{balance}</p><p className="text-[10px] uppercase font-bold text-gray-500">Wallet</p></div><div className="p-4 bg-green-50 rounded-xl text-center"><p className="text-xl font-black text-green-600">₹{stats.totalSpent}</p><p className="text-[10px] uppercase font-bold text-gray-500">Spent</p></div><div className="p-4 bg-purple-50 rounded-xl text-center"><p className="text-xl font-black text-purple-600">{stats.totalTrips}</p><p className="text-[10px] uppercase font-bold text-gray-500">Trips</p></div><div className="p-4 bg-yellow-50 rounded-xl text-center"><p className="text-xl font-black text-yellow-600 flex justify-center items-center gap-1">4.9 <Star size={14} fill="currentColor"/></p><p className="text-[10px] uppercase font-bold text-gray-500">Guest Rating</p></div></div><h3 className="font-bold text-sm mb-3 flex items-center gap-2 text-gray-700"><ThumbsUp size={16}/> What Hosts Say</h3><div className="space-y-3"><div className="p-3 bg-gray-50 rounded-lg border border-gray-100"><div className="flex justify-between items-center mb-1"><span className="font-bold text-xs">Indiranagar Station</span><div className="flex text-yellow-400"><Star size={10} fill="currentColor"/><Star size={10} fill="currentColor"/><Star size={10} fill="currentColor"/><Star size={10} fill="currentColor"/><Star size={10} fill="currentColor"/></div></div><p className="text-xs text-gray-500 italic">"Very polite user, unplugged on time!"</p></div><div className="p-3 bg-gray-50 rounded-lg border border-gray-100"><div className="flex justify-between items-center mb-1"><span className="font-bold text-xs">Marina Beach Hub</span><div className="flex text-yellow-400"><Star size={10} fill="currentColor"/><Star size={10} fill="currentColor"/><Star size={10} fill="currentColor"/><Star size={10} fill="currentColor"/><Star size={10} fill="currentColor"/></div></div><p className="text-xs text-gray-500 italic">"Great guest. Highly recommended."</p></div></div></div></div></div>}
-      {activeInvoice && <div className="fixed inset-0 bg-black/60 z-[6000] flex justify-center items-center p-4"><div className="bg-white w-full max-w-sm p-8 rounded-2xl text-center"><div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4"><CheckCircle size={32}/></div><h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Success!</h2><p className="text-gray-500 mb-6">Transaction ID: <span className="font-mono font-bold text-black">{activeInvoice.invoiceId}</span></p><button onClick={() => setActiveInvoice(null)} className="w-full py-3 bg-gray-100 font-bold rounded-lg hover:bg-gray-200">Close Receipt</button></div></div>}
       {showSettingsModal && <div className="fixed inset-0 bg-black/60 z-[5000] flex justify-center items-center p-4"><div className="bg-white w-full max-w-sm rounded-2xl p-6"><h2 className="text-xl font-bold mb-4">Settings</h2><input type="password" placeholder="New Password" className="w-full p-3 border rounded-lg mb-4" onChange={e=>setNewPasswordForm(e.target.value)}/><button onClick={handleChangePasswordLoggedIn} className="w-full py-3 bg-red-600 text-white font-bold rounded-lg mb-2">Update Password</button><button onClick={()=>setShowSettingsModal(false)} className="w-full py-3 text-gray-500 font-bold">Close</button></div></div>}
       {showHostModal && <div className="fixed inset-0 bg-black/80 z-[2000] flex justify-center items-center p-4"><div className="bg-white w-full max-w-md rounded-2xl p-6 max-h-[90vh] overflow-y-auto"><h2 className="text-2xl font-bold mb-4">Add Station</h2><form onSubmit={handleAddStation} className="space-y-3"><input required className="w-full p-3 border rounded-lg" placeholder="Station Name" value={formData.name} onChange={e=>setFormData({...formData, name:e.target.value})}/><input required className="w-full p-3 border rounded-lg" placeholder="Host Name" value={formData.hostName} onChange={e=>setFormData({...formData, hostName:e.target.value})}/><input required className="w-full p-3 border rounded-lg" placeholder="Aadhar ID" value={formData.adharId} onChange={e=>setFormData({...formData, adharId:e.target.value})}/><input required className="w-full p-3 border rounded-lg" placeholder="Station Address" value={formData.address} onChange={e=>setFormData({...formData, address:e.target.value})}/><div className="flex gap-2"><input required className="w-1/2 p-3 border rounded-lg" placeholder="Phone" value={formData.phone} onChange={e=>setFormData({...formData, phone:e.target.value})}/><input required className="w-1/2 p-3 border rounded-lg" placeholder="Time (9am-9pm)" value={formData.timings} onChange={e=>setFormData({...formData, timings:e.target.value})}/></div><input required type="number" className="w-full p-3 border rounded-lg" placeholder="Price per Hour (₹)" value={formData.price} onChange={e=>setFormData({...formData, price:e.target.value})}/><button type="submit" className="w-full py-3 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700">Deploy Station</button></form><button onClick={()=>setShowHostModal(false)} className="absolute top-4 right-4 bg-gray-100 p-2 rounded-full"><X size={18}/></button></div></div>}
     </div>

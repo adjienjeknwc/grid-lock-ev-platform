@@ -21,7 +21,7 @@ const io = new Server(server, {
 // --- DATABASE CONNECTION ---
 // Replace this string with your actual MongoDB connection string if it's different
 // or use process.env.MONGO_URI if you set it up in Render
-const MONGO_URI = "mongodb+srv://gridlock_user:gridlock123@cluster0.mongodb.net/gridlock?retryWrites=true&w=majority";
+const MONGO_URI = "mongodb+srv://admin:password1234@admin.qv5es5r.mongodb.net/?appName=admin";
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log("✅ MongoDB Connected"))

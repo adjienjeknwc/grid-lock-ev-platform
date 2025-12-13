@@ -110,9 +110,12 @@ function App() {
         socket.on("global_update", (newStation) => setStations(prev => [...prev, newStation]));
         
         // NEW: Listen for Python Simulation Data
-        socket.on("live_analytics", (data) => {
-            setAnalytics(data);
-        });
+        // NEW: Listen for Python Simulation Data
+socket.on("live_analytics", (data) => {
+    console.log("🔥 DATA RECEIVED FROM PYTHON:", data); // <--- Add this
+    setAnalytics(data);
+});
+
         
     } else { 
         localStorage.removeItem('gridlock_user'); 
